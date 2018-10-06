@@ -15,6 +15,7 @@ import yaml
 from scipy.spatial import KDTree
 
 STATE_COUNT_THRESHOLD = 3
+CLASSIFIER_COUNT_THRESHOLD = 3
 
 class TLDetector(object):
     def __init__(self):
@@ -54,6 +55,10 @@ class TLDetector(object):
         self.last_state = TrafficLight.UNKNOWN
         self.last_wp = -1
         self.state_count = 0
+        
+        self.classifier_count = CLASSIFIER_COUNT_THRESHOLD
+        self.classifier_last_state = TrafficLight.UNKNOWN
+        self.classifier_last_wp = -1
 
         rospy.spin()
 
@@ -98,9 +103,22 @@ class TLDetector(object):
             msg (Image): image from car-mounted camera
 
         """
-        self.has_image = True
-        self.camera_image = msg
-        light_wp, state = self.process_traffic_lights()
+        # Classify every CLASSIFIER_COUNT_THRESHOLDth camera images (Ex. every third or fourth camera image)
+        # Classifier will run at the startup time since
+        #     self.classifier_count is initialized with CLASSIFIER_COUNT_THRESHOLD
+        # This can help with the latency when turning on camera images in the simulator
+        if self.classifier_count >= CLASSIFIER_COUNT_THRESHOLD:
+            self.has_image = True
+            self.camera_image = msg
+            light_wp, state = self.process_traffic_lights()
+            
+            self.classifier_last_wp = light_wp
+            self.classifier_last_state = state
+            self.classifier_count = 0
+        else:
+            light_wp = self.classifier_last_wp
+            state = self.classifier_last_state
+            self.classifier_count += 1
 
         '''
         Publish upcoming red lights at camera frequency.
