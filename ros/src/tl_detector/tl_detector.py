@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+import os
+import glob
 import rospy
 from std_msgs.msg import Int32
 from geometry_msgs.msg import PoseStamped, Pose
@@ -13,6 +15,7 @@ import yaml
 from scipy.spatial import KDTree
 
 STATE_COUNT_THRESHOLD = 3
+CLASSIFIER_COUNT_THRESHOLD = 3
 
 class TLDetector(object):
     def __init__(self):
@@ -44,15 +47,41 @@ class TLDetector(object):
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
 
         self.bridge = CvBridge()
-        self.light_classifier = TLClassifier()
+        frozen_model_file = self.get_model_path()
+        self.light_classifier = TLClassifier(frozen_model_file)
         self.listener = tf.TransformListener()
 
         self.state = TrafficLight.UNKNOWN
         self.last_state = TrafficLight.UNKNOWN
         self.last_wp = -1
         self.state_count = 0
+        
+        self.classifier_count = CLASSIFIER_COUNT_THRESHOLD
+        self.classifier_last_state = TrafficLight.UNKNOWN
+        self.classifier_last_wp = -1
 
         rospy.spin()
+
+    def get_model_path(self):
+        is_site = self.config['is_site']
+        model_dir = None
+        if is_site:
+            rospy.loginfo('Loading model for site mode.')
+            model_dir = "./model/site"
+        else:
+            rospy.loginfo('Loading model for sim mode.')
+            model_dir = "./model/sim"
+
+        model_file = model_dir + "/frozen_inference_graph.pb"
+        if not os.path.exists(model_file):
+            with open(model_file, "wb") as model_out:
+                for chunk_file in sorted(glob.glob(model_dir + "/model_chunk_*")):
+                    with open(chunk_file, "rb") as chunk_in:
+                        model_out.write(chunk_in.read())
+                model_out.close()
+        assert os.path.exists(model_file)
+        return model_file
+            
 
     def pose_cb(self, msg):
         self.pose = msg
@@ -74,9 +103,22 @@ class TLDetector(object):
             msg (Image): image from car-mounted camera
 
         """
-        self.has_image = True
-        self.camera_image = msg
-        light_wp, state = self.process_traffic_lights()
+        # Classify every CLASSIFIER_COUNT_THRESHOLDth camera images (Ex. every third or fourth camera image)
+        # Classifier will run at the startup time since
+        #     self.classifier_count is initialized with CLASSIFIER_COUNT_THRESHOLD
+        # This can help with the latency when turning on camera images in the simulator
+        if self.classifier_count >= CLASSIFIER_COUNT_THRESHOLD:
+            self.has_image = True
+            self.camera_image = msg
+            light_wp, state = self.process_traffic_lights()
+            
+            self.classifier_last_wp = light_wp
+            self.classifier_last_state = state
+            self.classifier_count = 0
+        else:
+            light_wp = self.classifier_last_wp
+            state = self.classifier_last_state
+            self.classifier_count += 1
 
         '''
         Publish upcoming red lights at camera frequency.
@@ -119,15 +161,14 @@ class TLDetector(object):
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
 
         """
-        return light.state
-        #if(not self.has_image):
-        #   self.prev_light_loc = None
-        #   return False
-        #
-        #cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
-        #
+        if (not self.has_image):
+           self.prev_light_loc = None
+           return False
+
+        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "rgb8")
+
         #Get classification
-        #return self.light_classifier.get_classification(cv_image)
+        return self.light_classifier.get_classification(cv_image)
 
     def process_traffic_lights(self):
         """Finds closest visible traffic light, if one exists, and determines its
