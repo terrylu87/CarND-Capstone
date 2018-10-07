@@ -41,3 +41,4 @@ class YawController(object):
         self.prev_steering = self.steering
         self.steering = steering
         return self.steering
+
