@@ -24,8 +24,8 @@ as well as to verify your TL classifier.
 TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
-LOOKAHEAD_WPS = 100 # Number of waypoints we will publish. You can change this number
-STOP_DECEL_WPS = 30 # Number of waypoints to start decelerating for stopline
+LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
+STOP_DECEL_WPS = 25 # Number of waypoints to start decelerating for stopline
 MAX_DECEL = 0.1 # Maximum deceleration of waypoints
 
 class WaypointUpdater(object):
