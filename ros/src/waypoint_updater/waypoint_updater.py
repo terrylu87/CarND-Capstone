@@ -24,8 +24,9 @@ as well as to verify your TL classifier.
 TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
-LOOKAHEAD_WPS = 30 # Number of waypoints we will publish. You can change this number
-MAX_DECEL = 0.5 # Maximum deceleration of waypoints
+LOOKAHEAD_WPS = 100 # Number of waypoints we will publish. You can change this number
+STOP_DECEL_WPS = 30 # Number of waypoints to start decelerating for stopline
+MAX_DECEL = 0.1 # Maximum deceleration of waypoints
 
 class WaypointUpdater(object):
     def __init__(self):
@@ -98,18 +99,17 @@ class WaypointUpdater(object):
         return lane
 
     def decelerate_waypoints(self, waypoints, start_idx):
-        new_waypoints = []
-        #stop_idx = max(self.stopline_wp_idx - start_idx - 2, 0) # -2 to accomodate car front to be behind stop line
-        stop_idx = max(self.stopline_wp_idx - start_idx, 0)
-        for i, wp in enumerate(waypoints):
+        stop_idx = max(self.stopline_wp_idx - start_idx - 2, 0) # -2 to accomodate car front to be behind stop line
+        decel_idx = max(stop_idx - STOP_DECEL_WPS, 0)
+        new_waypoints = waypoints[:decel_idx]
+        for i in range(decel_idx, len(waypoints)):
             p = Waypoint()
-            p.pose = wp.pose
+            p.pose = waypoints[i].pose
             dist = self.distance(waypoints, i, stop_idx)
-            vel = math.sqrt(2 * MAX_DECEL * dist) # u^2 = v^2 - 2*a*d, v = 0, a < 0
-            #if vel < 1.0:
-            #   vel = 0
-
-            p.twist.twist.linear.x = min(vel, self.get_waypoint_velocity(p))
+            vel = max(math.sqrt(2 * MAX_DECEL * dist), 1.) # u^2 = v^2 - 2*a*d, v = 0, a < 0
+            if i >= stop_idx:
+                vel = 0.
+            p.twist.twist.linear.x = vel
             new_waypoints.append(p)
         return new_waypoints
             
