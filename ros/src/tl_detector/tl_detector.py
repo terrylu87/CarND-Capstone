@@ -16,6 +16,7 @@ from scipy.spatial import KDTree
 
 STATE_COUNT_THRESHOLD = 3
 CLASSIFIER_COUNT_THRESHOLD = 3
+MAX_TL_WPS = 200 # We don't look for traffic light beyod these many waypoints 
 
 class TLDetector(object):
     def __init__(self):
@@ -63,9 +64,8 @@ class TLDetector(object):
         rospy.spin()
 
     def get_model_path(self):
-        is_site = self.config['is_site']
         model_dir = None
-        if is_site:
+        if self.config['is_site']:
             rospy.loginfo('Loading model for site mode.')
             model_dir = "./model/site"
         else:
@@ -163,12 +163,15 @@ class TLDetector(object):
         """
         if (not self.has_image):
            self.prev_light_loc = None
-           return False
+           return TrafficLight.UNKNOWN
 
         cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "rgb8")
 
-        #Get classification
-        return self.light_classifier.get_classification(cv_image)
+        # Get classification
+        if self.config['use_classifier']:
+            return self.light_classifier.get_classification(cv_image)
+        else:
+            return light.state
 
     def process_traffic_lights(self):
         """Finds closest visible traffic light, if one exists, and determines its
@@ -187,7 +190,7 @@ class TLDetector(object):
             car_position = self.get_closest_waypoint(self.pose.pose.position.x, self.pose.pose.position.y)
 
         # find the closest visible traffic light (if one exists)
-        diff = len(self.waypoints.waypoints)
+        diff = MAX_TL_WPS
         for i, temp_light in enumerate(self.lights):
             # Get the stop line index 
             line = stop_line_positions[i]
