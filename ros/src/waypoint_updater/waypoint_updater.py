@@ -26,7 +26,7 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 
 LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
 STOP_DECEL_WPS = 25 # Number of waypoints to start decelerating for stopline
-MAX_DECEL = 0.1 # Maximum deceleration of waypoints
+MAX_DECEL = 0.5 # Maximum deceleration of waypoints
 
 class WaypointUpdater(object):
     def __init__(self):
@@ -47,7 +47,7 @@ class WaypointUpdater(object):
         self.loop()
 
     def loop(self):
-        rate = rospy.Rate(15)
+        rate = rospy.Rate(3)
         while not rospy.is_shutdown():
             if self.pose and self.base_lane:
                 # Get the closest waypoint
@@ -80,6 +80,7 @@ class WaypointUpdater(object):
 
     def publish_waypoints(self, closest_idx):
         final_lane = self.generate_lane(closest_idx)
+        final_lane.header = self.base_lane.header
         self.final_waypoints_pub.publish(final_lane)
 
     def generate_lane(self, closest_idx):
