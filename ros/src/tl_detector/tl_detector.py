@@ -2,6 +2,7 @@
 import os
 import glob
 import rospy
+import numpy as np
 from std_msgs.msg import Int32
 from geometry_msgs.msg import PoseStamped, Pose
 from styx_msgs.msg import TrafficLightArray, TrafficLight
@@ -16,6 +17,7 @@ from scipy.spatial import KDTree
 
 STATE_COUNT_THRESHOLD = 3
 CLASSIFIER_COUNT_THRESHOLD = 3
+MAX_TL_WPS = 200 # We don't look for traffic light beyod these many waypoints 
 
 class TLDetector(object):
     def __init__(self):
@@ -47,8 +49,18 @@ class TLDetector(object):
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
 
         self.bridge = CvBridge()
-        frozen_model_file = self.get_model_path()
-        self.light_classifier = TLClassifier(frozen_model_file)
+
+        # Create a Traffic light classifier if configured
+        if self.config['use_classifier']:
+            frozen_model_file = self.get_model_path()
+            self.light_classifier = TLClassifier(frozen_model_file)
+            # First image classification takes longer, so we classify
+            # a dummy image to speed up actual classification later
+            width = self.config['camera_info']['image_width']
+            height = self.config['camera_info']['image_height']
+            dummy_image = np.zeros(shape=(height, width, 3))
+            self.light_classifier.get_classification(dummy_image)
+
         self.listener = tf.TransformListener()
 
         self.state = TrafficLight.UNKNOWN
@@ -63,9 +75,8 @@ class TLDetector(object):
         rospy.spin()
 
     def get_model_path(self):
-        is_site = self.config['is_site']
         model_dir = None
-        if is_site:
+        if self.config['is_site']:
             rospy.loginfo('Loading model for site mode.')
             model_dir = "./model/site"
         else:
@@ -161,13 +172,16 @@ class TLDetector(object):
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
 
         """
+        if (not self.config['use_classifier']):
+           return light.state
+
         if (not self.has_image):
            self.prev_light_loc = None
-           return False
+           return TrafficLight.UNKNOWN
 
         cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "rgb8")
 
-        #Get classification
+        # Get classification
         return self.light_classifier.get_classification(cv_image)
 
     def process_traffic_lights(self):
@@ -187,7 +201,7 @@ class TLDetector(object):
             car_position = self.get_closest_waypoint(self.pose.pose.position.x, self.pose.pose.position.y)
 
         # find the closest visible traffic light (if one exists)
-        diff = len(self.waypoints.waypoints)
+        diff = MAX_TL_WPS
         for i, temp_light in enumerate(self.lights):
             # Get the stop line index 
             line = stop_line_positions[i]

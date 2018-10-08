@@ -24,7 +24,8 @@ as well as to verify your TL classifier.
 TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
-LOOKAHEAD_WPS = 40 # Number of waypoints we will publish. You can change this number
+LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
+STOP_DECEL_WPS = 25 # Number of waypoints to start decelerating for stopline
 MAX_DECEL = 0.5 # Maximum deceleration of waypoints
 
 class WaypointUpdater(object):
@@ -35,12 +36,8 @@ class WaypointUpdater(object):
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
         rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
 
-        # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
-
-
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
-        # TODO: Add other member variables you need below
         self.pose = None
         self.base_lane = None
         self.waypoints_2d = None
@@ -99,35 +96,31 @@ class WaypointUpdater(object):
         return lane
 
     def decelerate_waypoints(self, waypoints, start_idx):
-        new_waypoints = []
-        #stop_idx = max(self.stopline_wp_idx - start_idx - 2, 0) # -2 to accomodate car front to be behind stop line
-        stop_idx = max(self.stopline_wp_idx - start_idx, 0)
-        for i, wp in enumerate(waypoints):
+        stop_idx = max(self.stopline_wp_idx - start_idx - 4, 0) # -4 to accomodate car front to be behind stop line
+        decel_idx = max(stop_idx - STOP_DECEL_WPS, 0)
+        new_waypoints = waypoints[:decel_idx]
+        for i in range(decel_idx, len(waypoints)):
             p = Waypoint()
-            p.pose = wp.pose
+            p.pose = waypoints[i].pose
             dist = self.distance(waypoints, i, stop_idx)
-            vel = math.sqrt(2 * MAX_DECEL * dist) # u^2 = v^2 - 2*a*d, v = 0, a < 0
-            #if vel < 1.0:
-            #   vel = 0
-
-            p.twist.twist.linear.x = min(vel, self.get_waypoint_velocity(p))
+            vel = max(math.sqrt(2 * MAX_DECEL * dist), 1.) # u^2 = v^2 - 2*a*d, v = 0, a < 0
+            if i >= stop_idx:
+                vel = 0.
+            p.twist.twist.linear.x = vel
             new_waypoints.append(p)
         return new_waypoints
             
 
     def pose_cb(self, msg):
-        # TODO: Implement
         self.pose = msg
 
     def waypoints_cb(self, waypoints):
-        # TODO: Implement
         self.base_lane = waypoints
         if not self.waypoints_2d:
             self.waypoints_2d = [[wp.pose.pose.position.x, wp.pose.pose.position.y] for wp in waypoints.waypoints]
             self.waypoint_tree = KDTree(self.waypoints_2d)
 
     def traffic_cb(self, msg):
-        # TODO: Callback for /traffic_waypoint message. Implement
         self.stopline_wp_idx = msg.data
 
     def obstacle_cb(self, msg):
