@@ -96,7 +96,7 @@ class WaypointUpdater(object):
         return lane
 
     def decelerate_waypoints(self, waypoints, start_idx):
-        stop_idx = max(self.stopline_wp_idx - start_idx - 2, 0) # -2 to accomodate car front to be behind stop line
+        stop_idx = max(self.stopline_wp_idx - start_idx - 4, 0) # -4 to accomodate car front to be behind stop line
         decel_idx = max(stop_idx - STOP_DECEL_WPS, 0)
         new_waypoints = waypoints[:decel_idx]
         for i in range(decel_idx, len(waypoints)):
