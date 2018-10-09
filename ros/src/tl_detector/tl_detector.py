@@ -17,7 +17,7 @@ from scipy.spatial import KDTree
 
 STATE_COUNT_THRESHOLD = 3
 CLASSIFIER_COUNT_THRESHOLD = 3
-MAX_TL_WPS = 200 # We don't look for traffic light beyod these many waypoints 
+MAX_TL_WPS = 100 # We don't look for traffic light beyod these many waypoints 
 
 class TLDetector(object):
     def __init__(self):
