@@ -1,0 +1,16 @@
+# Add NVIDIA package repository
+sudo apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/7fa2af80.pub
+wget http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/cuda-repo-ubuntu1604_9.1.85-1_amd64.deb
+sudo apt install ./cuda-repo-ubuntu1604_9.1.85-1_amd64.deb
+wget http://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1604/x86_64/nvidia-machine-learning-repo-ubuntu1604_1.0.0-1_amd64.deb
+sudo apt install ./nvidia-machine-learning-repo-ubuntu1604_1.0.0-1_amd64.deb
+sudo apt update
+
+# Install CUDA 8.0 and tools.
+sudo apt install cuda8.0 cuda-cublas-8-0 cuda-cufft-8-0 cuda-curand-8-0 \
+    cuda-cusolver-8-0 cuda-cusparse-8-0 libcudnn6 \
+    cuda-command-line-tools-8-0
+
+# Install tensorflow-gpu 1.3
+pip install --user tensorflow-gpu==1.3
+
