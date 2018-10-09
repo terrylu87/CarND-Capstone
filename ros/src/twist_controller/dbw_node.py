@@ -8,7 +8,7 @@ from tf.transformations import euler_from_quaternion, quaternion_from_euler
 from dbw_mkz_msgs.msg import ThrottleCmd, SteeringCmd, BrakeCmd, SteeringReport
 from geometry_msgs.msg import TwistStamped, PoseStamped, Vector3, Point
 from styx_msgs.msg import Lane, Waypoint
-import math
+from math import sin, cos, atan, pi, atan2, sqrt
 import numpy as np
 
 from twist_controller import Controller
@@ -57,9 +57,9 @@ class DBWNode(object):
                                             ThrottleCmd, queue_size=1)
         self.brake_pub = rospy.Publisher('/vehicle/brake_cmd',
                                          BrakeCmd, queue_size=1)
-        self.target_heading_pub = rospy.Publisher('/target_heading', Float32, queue_size=1)
-        self.current_heading_pub = rospy.Publisher('/current_heading', Float32, queue_size=1)
-        self.command_angle_pub = rospy.Publisher('/command_angle', Float32, queue_size=1)
+        # self.target_heading_pub = rospy.Publisher('/target_heading', Float32, queue_size=1)
+        # self.current_heading_pub = rospy.Publisher('/current_heading', Float32, queue_size=1)
+        # self.command_angle_pub = rospy.Publisher('/command_angle', Float32, queue_size=1)
 
         # TODO: Create `Controller` object
         self.controller = Controller(vehicle_mass=vehicle_mass,
@@ -89,8 +89,8 @@ class DBWNode(object):
         self.current_heading = 0.
         self.command_angle = 0.
         self.position = None
-        self.rel_distance = 10
-        self.steer_ratio = steer_ratio
+        self.rel_distance = 20
+        self.offset = 0
 
         self.loop()
 
@@ -102,7 +102,8 @@ class DBWNode(object):
             if not None in (self.current_vel, self.linear_vel, self.angular_vel):
                 self.throttle, self.brake, self.steering = \
                         self.controller.control(self.current_vel, self.dbw_enabled,
-                                                self.linear_vel, self.current_heading, self.command_angle)
+                                                self.linear_vel, self.current_heading,
+                                                self.command_angle, self.offset)
 
             if self.dbw_enabled:
                 self.publish(self.throttle, self.brake, self.steering)
@@ -128,12 +129,12 @@ class DBWNode(object):
         else:
             diffx = second.pose.pose.position.x - first.pose.pose.position.x
             diffy = second.pose.pose.position.y - first.pose.pose.position.y
-            self.target_heading = math.atan2(diffy, diffx)
+            self.target_heading = atan2(diffy, diffx)
             self.position = first.pose.pose.position
 
     def distance(self, p1, p2):
         x, y = p1.x - p2.x, p1.y - p2.y
-        return math.sqrt(x*x + y*y)
+        return sqrt(x*x + y*y)
     
     def vector(self, p1, p2):
         return np.array([p2.x - p1.x, p2.y - p1.y])
@@ -144,18 +145,20 @@ class DBWNode(object):
         angles = euler_from_quaternion([q.x, q.y, q.z, q.w])
         self.current_heading = angles[2]
         if self.position:
-            offset = self.distance(p, self.position)
+            self.offset = self.distance(p, self.position)
             car_wp = self.vector(p, self.position)
-            y = 10*math.sin(self.current_heading)
-            x = 10*math.cos(self.current_heading)
+            y = 10*sin(self.current_heading)
+            x = 10*cos(self.current_heading)
             car = Point(p.x,p.y,p.z)
             p.x = p.x + x
             p.y = p.y + y
             car_heading = self.vector(car, p)
             cross = np.cross(car_heading, car_wp)
-            correction = math.atan(offset/self.rel_distance)*cross/(abs(cross))
+            correction = 0
+            if self.offset > 0.5:
+                correction = atan(self.offset/self.rel_distance)*cross/(abs(cross))
+                correction = min(30*pi/180, max(-30*pi/180, correction) )
             self.command_angle = self.target_heading + correction
-        # self.current_heading_pub.publish(angles[2])
 
     def publish(self, throttle, brake, steer):
         tcmd = ThrottleCmd()
@@ -175,9 +178,9 @@ class DBWNode(object):
         bcmd.pedal_cmd = brake
         self.brake_pub.publish(bcmd)
 
-        self.target_heading_pub.publish(self.target_heading)
-        self.current_heading_pub.publish(self.current_heading)
-        self.command_angle_pub.publish(self.steering)
+        # self.target_heading_pub.publish(self.target_heading)
+        # self.current_heading_pub.publish(self.current_heading)
+        # self.command_angle_pub.publish(self.steering)
 
 
 if __name__ == '__main__':
