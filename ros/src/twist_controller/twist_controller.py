@@ -12,9 +12,11 @@ class Controller(object):
     def __init__(self, vehicle_mass, fuel_capacity, brake_deadband, decel_limit,
                        accel_limit, wheel_radius, wheel_base, steer_ratio,
                        max_lat_accel, max_steer_angle):
-        # TODO: Implement
+        
+        # Original Yaw Controller
         # self.yaw_controller = YawController(wheel_base, steer_ratio, 0.1, max_lat_accel, max_steer_angle)
-
+        
+        # New PID based Yaw Controller
         kp = 10
         ki = 0.0
         kd = 5
@@ -22,9 +24,10 @@ class Controller(object):
         mx = max_steer_angle # Max throttle
         self.yaw_controller = PID(kp, ki, kd, mn, mx)
 
-        kp = 0.5
-        ki = 0.0
-        kd = 0.1
+        kp = 130.0
+        ki = 10.0
+        kd = 20.0
+
         mn = 0.  # Min throttle
         mx = 0.2 # Max throttle
         self.throttle_controller = PID(kp, ki, kd, mn, mx)
@@ -46,11 +49,14 @@ class Controller(object):
 
         self.last_time = rospy.get_time()
 
+    # Old version for old yaw controller
+    # def control(self, current_vel, dbw_enabled, linear_vel, angular_vel):
+
     def safeangle(self, angle):
         return (angle+PI) % (2*PI) - PI
 
     def control(self, current_vel, dbw_enabled, linear_vel, current_angle, command_angle):
-        # TODO: Change the arg, kwarg list to suit your needs
+
         # Return throttle, brake, steer
 
         if not dbw_enabled:
