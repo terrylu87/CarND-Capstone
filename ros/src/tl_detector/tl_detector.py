@@ -49,6 +49,16 @@ class TLDetector(object):
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
 
         self.bridge = CvBridge()
+        self.listener = tf.TransformListener()
+
+        self.state = TrafficLight.UNKNOWN
+        self.last_state = TrafficLight.UNKNOWN
+        self.last_wp = -1
+        self.state_count = 0
+        
+        self.classifier_count = CLASSIFIER_COUNT_THRESHOLD
+        self.classifier_last_state = TrafficLight.UNKNOWN
+        self.classifier_last_wp = -1
 
         # Create a Traffic light classifier if configured
         if self.config['use_classifier']:
@@ -61,16 +71,7 @@ class TLDetector(object):
             dummy_image = np.zeros(shape=(height, width, 3))
             self.light_classifier.get_classification(dummy_image)
 
-        self.listener = tf.TransformListener()
-
-        self.state = TrafficLight.UNKNOWN
-        self.last_state = TrafficLight.UNKNOWN
-        self.last_wp = -1
-        self.state_count = 0
-        
-        self.classifier_count = CLASSIFIER_COUNT_THRESHOLD
-        self.classifier_last_state = TrafficLight.UNKNOWN
-        self.classifier_last_wp = -1
+        rospy.loginfo('Initialized tl_detector')
 
         rospy.spin()
 
