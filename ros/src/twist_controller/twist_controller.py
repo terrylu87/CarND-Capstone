@@ -14,16 +14,8 @@ class Controller(object):
                        max_lat_accel, max_steer_angle):
         
         # Original Yaw Controller
-        # self.yaw_controller = YawController(wheel_base, steer_ratio, 0.1, max_lat_accel, max_steer_angle)
+        self.yaw_controller = YawController(wheel_base, steer_ratio, 0.1, max_lat_accel, max_steer_angle)
         
-        # New PID based Yaw Controller
-        kp = -10
-        ki = 0.0
-        kd = -1.0
-        mn = -max_steer_angle  # Min throttle
-        mx = max_steer_angle # Max throttle
-        self.yaw_controller = PID(kp, ki, kd, mn, mx)
-
         kp = 0.5
         ki = 0.0
         kd = 0.1
@@ -34,9 +26,6 @@ class Controller(object):
         tau = 0.5 # 1/(2pi*tau) = cutoff frequency
         ts = 0.02 # Sample time
         self.vel_lpf = LowPassFilter(tau, ts)
-        tau = 0.3 # 1/(2pi*tau) = cutoff frequency
-        ts = 0.02 # Sample time
-        self.yaw_lpf = LowPassFilter(tau, ts)
     
         self.vehicle_mass = vehicle_mass
         self.fuel_capacity = fuel_capacity
@@ -44,6 +33,7 @@ class Controller(object):
         self.decel_limit = decel_limit
         self.accel_limit = accel_limit
         self.wheel_radius = wheel_radius
+        self.steer_ratio = steer_ratio
 
         self.last_time = rospy.get_time()
 
@@ -61,17 +51,14 @@ class Controller(object):
             self.throttle_controller.reset()
             return 0., 0., 0.
 
-        # steering = self.yaw_controller.get_steering(linear_vel, angular_vel, current_vel)
         yaw_error = self.safeangle(current_angle-command_angle)
+        angular_vel = -yaw_error*max(10/current_vel, 1)
         self.last_yaw = current_angle
+        steering = self.yaw_controller.get_steering(linear_vel, angular_vel, current_vel)
+        
         current_time = rospy.get_time()
         sample_time = current_time - self.last_time
         self.last_time = current_time
-        # if yaw_error < (1*PI/180) and offset < 0.5:
-        #     steering = 0
-        # else:
-        steering = self.yaw_controller.step(yaw_error, sample_time)
-        steering = self.yaw_lpf.filt(steering)
 
         current_vel = self.vel_lpf.filt(current_vel)
         vel_error = linear_vel - current_vel

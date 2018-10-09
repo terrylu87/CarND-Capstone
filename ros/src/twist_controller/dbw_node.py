@@ -89,8 +89,7 @@ class DBWNode(object):
         self.current_heading = 0.
         self.command_angle = 0.
         self.position = None
-        self.rel_distance = 5
-        self.steer_ratio = steer_ratio
+        self.rel_distance = 20
         self.offset = 0
 
         self.loop()
@@ -158,7 +157,7 @@ class DBWNode(object):
             correction = 0
             if self.offset > 0.5:
                 correction = atan(self.offset/self.rel_distance)*cross/(abs(cross))
-                correction = min(2*pi/180, max(-2*pi/180, correction) )
+                correction = min(30*pi/180, max(-30*pi/180, correction) )
             self.command_angle = self.target_heading + correction
 
     def publish(self, throttle, brake, steer):
